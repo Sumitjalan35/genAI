@@ -1,16 +1,65 @@
 import { motion } from 'framer-motion';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { CheckCircle, ArrowRight, User, GraduationCap, Briefcase } from 'lucide-react';
+import { CheckCircle, ArrowRight, User, GraduationCap, Briefcase, Loader2, AlertCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useCareer } from '../contexts/CareerContext';
+import CareerAdviceDisplay from '../components/CareerAdviceDisplay';
+import apiService from '../services/api';
 
 const SummaryPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { formData, userType } = location.state || {};
+  const { updateProfile, updateAIAdvice } = useCareer();
+  
+  const [aiAdvice, setAiAdvice] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   if (!formData) {
     navigate('/profile-setup');
     return null;
   }
+
+  // Fetch AI advice when component mounts
+  useEffect(() => {
+    const fetchAIAdvice = async () => {
+      setIsLoading(true);
+      setError(null);
+      
+      console.log('Starting AI advice fetch...', { userType, formData });
+      
+      try {
+        let response;
+        if (userType === 'student') {
+          console.log('Calling student API...');
+          response = await apiService.getStudentCareerAdvice(formData);
+        } else {
+          console.log('Calling professional API...');
+          response = await apiService.getProfessionalCareerAdvice(formData);
+        }
+        
+        console.log('API Response:', response);
+        
+        if (response && response.success) {
+          console.log('Setting AI advice:', response.advice);
+          setAiAdvice(response.advice);
+          updateAIAdvice(response.advice);
+          updateProfile(formData, userType);
+        } else {
+          console.error('API returned error:', response);
+          setError(response?.error || 'Failed to generate advice');
+        }
+      } catch (err) {
+        console.error('Error fetching AI advice:', err);
+        setError(`Failed to connect to AI service: ${err.message}`);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchAIAdvice();
+  }, [formData, userType]);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -308,24 +357,84 @@ const SummaryPage = () => {
             </motion.button>
           </motion.div>
 
-          {/* AI Processing Notice */}
-          <motion.div
-            variants={itemVariants}
-            className="bg-primary-50 border border-primary-200 rounded-lg p-6 text-center"
-          >
-            <div className="flex items-center justify-center space-x-2 mb-2">
-              <div className="w-2 h-2 bg-primary-600 rounded-full animate-bounce"></div>
-              <div className="w-2 h-2 bg-primary-600 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-              <div className="w-2 h-2 bg-primary-600 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-            </div>
-            <h3 className="text-lg font-semibold text-primary-800 mb-2">
-              AI Analysis in Progress
-            </h3>
-            <p className="text-primary-600">
-              Our AI is analyzing your profile and will generate personalized career recommendations. 
-              This usually takes a few moments.
-            </p>
-          </motion.div>
+          {/* AI Advice Section */}
+          {isLoading && (
+            <motion.div
+              variants={itemVariants}
+              className="bg-primary-50 border border-primary-200 rounded-lg p-6 text-center"
+            >
+              <div className="flex items-center justify-center space-x-2 mb-4">
+                <Loader2 className="w-6 h-6 text-primary-600 animate-spin" />
+                <span className="text-primary-600 font-medium">AI Analysis in Progress</span>
+              </div>
+              <p className="text-primary-600">
+                Our AI is analyzing your profile and generating personalized career recommendations. 
+                This usually takes a few moments.
+              </p>
+            </motion.div>
+          )}
+
+          {error && (
+            <motion.div
+              variants={itemVariants}
+              className="bg-red-50 border border-red-200 rounded-lg p-6"
+            >
+              <div className="flex items-center space-x-2 mb-2">
+                <AlertCircle className="w-5 h-5 text-red-600" />
+                <h3 className="text-lg font-semibold text-red-800">Error Generating Advice</h3>
+              </div>
+              <p className="text-red-600 mb-4">{error}</p>
+              <div className="flex space-x-4">
+                <button
+                  onClick={() => window.location.reload()}
+                  className="btn-primary"
+                >
+                  Reload Page
+                </button>
+                <button
+                  onClick={() => {
+                    setError(null);
+                    setIsLoading(true);
+                    // Retry the API call
+                    const fetchAIAdvice = async () => {
+                      try {
+                        let response;
+                        if (userType === 'student') {
+                          response = await apiService.getStudentCareerAdvice(formData);
+                        } else {
+                          response = await apiService.getProfessionalCareerAdvice(formData);
+                        }
+                        
+                        if (response && response.success) {
+                          setAiAdvice(response.advice);
+                        } else {
+                          setError(response?.error || 'Failed to generate advice');
+                        }
+                      } catch (err) {
+                        setError(`Failed to connect to AI service: ${err.message}`);
+                      } finally {
+                        setIsLoading(false);
+                      }
+                    };
+                    fetchAIAdvice();
+                  }}
+                  className="btn-secondary"
+                >
+                  Retry API Call
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          {aiAdvice && (
+            <motion.div variants={itemVariants}>
+              <CareerAdviceDisplay 
+                advice={aiAdvice}
+                title="Your Personalized Career Advice"
+                subtitle="Based on your profile, here are our AI-powered recommendations"
+              />
+            </motion.div>
+          )}
         </motion.div>
       </div>
     </div>

@@ -43,38 +43,38 @@ class APIResponse(BaseModel):
 # Service Layer
 class CareerAdvisoryService:
     """Service class to handle career advisory business logic"""
-    
+
     def __init__(self):
         self.api_key = GEMINI_API_KEY
         self._setup_environment()
-    
+
     def _setup_environment(self):
         """Setup environment variables"""
         os.environ["GOOGLE_API_KEY"] = self.api_key
-    
+
     def get_career_advice(self, request: CareerAdvisoryRequest) -> CareerAdvisoryResponse:
         """
         Main service method to process career advisory request
-        
+
         Args:
             request: CareerAdvisoryRequest object
-            
+
         Returns:
             CareerAdvisoryResponse: Response with advice or error
         """
         try:
             # Generate prompt from request
             prompt = self._generate_career_prompt(request)
-            
+
             # Execute LLM with the generated prompt
             llm_response = self._execute_llm(prompt)
-            
+
             return CareerAdvisoryResponse(
                 success=True,
                 message="Career advice generated successfully",
                 advice=llm_response
             )
-            
+
         except Exception as e:
             return CareerAdvisoryResponse(
                 success=False,
@@ -82,18 +82,18 @@ class CareerAdvisoryService:
                 advice="",
                 error=str(e)
             )
-    
+
     def _generate_career_prompt(self, request: CareerAdvisoryRequest) -> str:
         """
         Generate a comprehensive prompt for the LLM based on user parameters
-        
+
         Args:
             request: CareerAdvisoryRequest object
-            
+
         Returns:
             str: Formatted prompt for LLM
         """
-        
+
         prompt = f"""You are an expert Career Skills Advisor. Please provide comprehensive career guidance based on the following student profile:
 
 STUDENT PROFILE:
@@ -111,10 +111,10 @@ ACHIEVEMENTS AND EXPERIENCE:
         # Add optional fields if available
         if request.technical_skills:
             prompt += f"\n- Technical Skills: {', '.join(request.technical_skills)}"
-        
+
         if request.soft_skills:
             prompt += f"\n- Soft Skills: {', '.join(request.soft_skills)}"
-        
+
         if request.additional_info:
             prompt += f"\n- Additional Information: {request.additional_info}"
 
@@ -154,16 +154,16 @@ Please provide detailed advice covering:
    - Career progression paths
 
 Provide specific, actionable, and personalized advice considering the student's profile, interests, and constraints."""
-        
+
         return prompt
 
     def _execute_llm(self, prompt: str) -> str:
         """
         Execute the LLM with the generated prompt using Google Gemini
-        
+
         Args:
             prompt: The generated prompt for the LLM
-        
+
         Returns:
             str: Response from the LLM
         """
@@ -177,11 +177,11 @@ Provide specific, actionable, and personalized advice considering the student's 
                 timeout=30,
                 max_retries=2
             )
-            
+
             # Invoke the LLM with the prompt
             response = llm.invoke(prompt)
             return response.content
-            
+
         except Exception as e:
             # Log error and return mock response for testing
             print(f"LLM Execution Error: {str(e)}")
@@ -196,7 +196,7 @@ Based on your profile, here are preliminary recommendations:
 
 🎯 CAREER PATH RECOMMENDATIONS:
 1. Software Engineering - High demand in tech sector
-2. Data Science & Analytics - Growing field with good prospects  
+2. Data Science & Analytics - Growing field with good prospects
 3. Product Management - Bridge between tech and business
 4. Cybersecurity - Critical need in all industries
 5. AI/ML Engineering - Future-focused career path
@@ -226,7 +226,7 @@ Short-term (3-6 months):
 - Build 2-3 portfolio projects
 - Join coding communities and forums
 
-Medium-term (6-18 months):  
+Medium-term (6-18 months):
 - Apply for internships or entry-level positions
 - Contribute to open-source projects
 - Network with professionals in chosen field
@@ -283,10 +283,10 @@ def test_career_advisory():
         soft_skills=["Leadership", "Team work"],
         additional_info="Interested in AI and Machine Learning"
     )
-    
+
     # Test the service
     response = handle_career_advice_request(sample_request)
-    
+
     print("=== CAREER SKILLS ADVISORY RESPONSE ===")
     print(f"Success: {response.success}")
     print(f"Message: {response.message}")
@@ -295,7 +295,7 @@ def test_career_advisory():
     else:
         print(f"Error: {response.error}")
     print("=" * 50)
-    
+
     return response
 
 # FastAPI Application Setup
@@ -329,21 +329,21 @@ async def health_check_endpoint():
 async def get_career_advice_endpoint(request: CareerAdvisoryRequest):
     """
     Main endpoint to get career advice based on student profile
-    
+
     Args:
         request: CareerAdvisoryRequest with student details
-        
+
     Returns:
         CareerAdvisoryResponse: AI-generated career advice
     """
     try:
         response = handle_career_advice_request(request)
-        
+
         if not response.success:
             raise HTTPException(status_code=400, detail=response.error)
-            
+
         return response
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 

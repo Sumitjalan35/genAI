@@ -40,38 +40,38 @@ class APIResponse(BaseModel):
 # Service Layer
 class ProfessionalAdvisoryService:
     """Service class to handle professional career advisory business logic"""
-    
+
     def __init__(self):
         self.api_key = GEMINI_API_KEY
         self._setup_environment()
-    
+
     def _setup_environment(self):
         """Setup environment variables"""
         os.environ["GOOGLE_API_KEY"] = self.api_key
-    
+
     def get_professional_advice(self, request: ProfessionalAdvisoryRequest) -> ProfessionalAdvisoryResponse:
         """
         Main service method to process professional career advisory request
-        
+
         Args:
             request: ProfessionalAdvisoryRequest object
-            
+
         Returns:
             ProfessionalAdvisoryResponse: Response with advice or error
         """
         try:
             # Generate prompt from request
             prompt = self._generate_professional_prompt(request)
-            
+
             # Execute LLM with the generated prompt
             llm_response = self._execute_llm(prompt)
-            
+
             return ProfessionalAdvisoryResponse(
                 success=True,
                 message="Professional career advice generated successfully",
                 advice=llm_response
             )
-            
+
         except Exception as e:
             return ProfessionalAdvisoryResponse(
                 success=False,
@@ -79,18 +79,18 @@ class ProfessionalAdvisoryService:
                 advice="",
                 error=str(e)
             )
-    
+
     def _generate_professional_prompt(self, request: ProfessionalAdvisoryRequest) -> str:
         """
         Generate a comprehensive prompt for the LLM based on professional user parameters
-        
+
         Args:
             request: ProfessionalAdvisoryRequest object
-            
+
         Returns:
             str: Formatted prompt for LLM
         """
-        
+
         prompt = f"""You are an expert Professional Career Advisor specializing in career advancement, transitions, and professional development. Please provide comprehensive career guidance based on the following professional profile:
 
 PROFESSIONAL PROFILE:
@@ -108,7 +108,7 @@ SKILL ASSESSMENT:"""
             for skill, level in request.skill_assessment.items():
                 if level:  # Only include skills with assessment
                     prompt += f"\n- {skill}: {level}"
-        
+
         prompt += f"""
 
 CURRENT CHALLENGES:
@@ -165,16 +165,16 @@ Please provide detailed professional career advice covering:
    - Stress management and productivity tips
 
 Provide specific, actionable, and personalized advice considering the professional's experience level, goals, challenges, and market conditions. Include concrete steps, resources, and timelines where applicable."""
-        
+
         return prompt
 
     def _execute_llm(self, prompt: str) -> str:
         """
         Execute the LLM with the generated prompt using Google Gemini
-        
+
         Args:
             prompt: The generated prompt for the LLM
-        
+
         Returns:
             str: Response from the LLM
         """
@@ -188,11 +188,11 @@ Provide specific, actionable, and personalized advice considering the profession
                 timeout=30,
                 max_retries=2
             )
-            
+
             # Invoke the LLM with the prompt
             response = llm.invoke(prompt)
             return response.content
-            
+
         except Exception as e:
             # Log error and return mock response for testing
             print(f"LLM Execution Error: {str(e)}")
@@ -320,10 +320,10 @@ def test_professional_advisory():
         current_challenges=["Career Growth", "Leadership Opportunities", "Skill Gap"],
         target_applications="Tech companies like Google, Microsoft, startups in AI/ML space, and fintech companies"
     )
-    
+
     # Test the service
     response = handle_professional_advice_request(sample_request)
-    
+
     print("=== PROFESSIONAL CAREER ADVISORY RESPONSE ===")
     print(f"Success: {response.success}")
     print(f"Message: {response.message}")
@@ -332,7 +332,7 @@ def test_professional_advisory():
     else:
         print(f"Error: {response.error}")
     print("=" * 50)
-    
+
     return response
 
 # FastAPI Application Setup
@@ -366,21 +366,21 @@ async def health_check_endpoint():
 async def get_professional_advice_endpoint(request: ProfessionalAdvisoryRequest):
     """
     Main endpoint to get professional career advice based on professional profile
-    
+
     Args:
         request: ProfessionalAdvisoryRequest with professional details
-        
+
     Returns:
         ProfessionalAdvisoryResponse: AI-generated professional career advice
     """
     try:
         response = handle_professional_advice_request(request)
-        
+
         if not response.success:
             raise HTTPException(status_code=400, detail=response.error)
-            
+
         return response
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
@@ -392,7 +392,7 @@ async def get_sample_request():
         "career_goals": "I want to transition into a senior management role in the tech industry within the next 2-3 years and eventually become a CTO.",
         "skill_assessment": {
             "Technical Skills": "Advanced",
-            "Communication": "Intermediate", 
+            "Communication": "Intermediate",
             "Leadership": "Intermediate",
             "Problem Solving": "Advanced",
             "Project Management": "Intermediate",
