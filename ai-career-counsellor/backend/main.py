@@ -1,4 +1,5 @@
 import json
+import re
 from typing import List, Optional, Dict , Any
 import os
 from pydantic import BaseModel, Field
@@ -16,7 +17,7 @@ import google.generativeai as genai
 # Configuration
 GEMINI_API_KEY = "AIzaSyBmknnBd4p_6nt81OMHcKnlj4SqPeUg0pk"
 gemini_model  = ChatGoogleGenerativeAI(
-                model="gemini-1.5-flash",
+                model="gemini-2.5-flash",
                 api_key=GEMINI_API_KEY,
                 temperature=0.7,
                 max_retries=2
@@ -27,12 +28,12 @@ if GEMINI_API_KEY and GEMINI_API_KEY != "your_gemini_api_key_here":
     try:
         genai.configure(api_key=GEMINI_API_KEY)
         gemini_model  = ChatGoogleGenerativeAI(
-                model="gemini-1.5-flash",
+                model="gemini-2.5-flash",
                 api_key=GEMINI_API_KEY,
                 temperature=0.7,
                 max_retries=2
             )
-        print("✅ Gemini 1.5-flash model initialized for job details")
+        print("✅ Gemini 2.5-flash model initialized for job details")
     except Exception as e:
         print(f"❌ Error initializing Gemini model: {e}")
         gemini_model = None
@@ -293,7 +294,7 @@ Please provide detailed advice covering:
 - Networking opportunities
 - Career progression paths
 
-**Important:** Use clear headings with emojis, bullet points for lists, and bold text for emphasis. Make the content easy to read and well-structured."""
+**Important:** Use clear headings with emojis, bullet points for lists, and bold text for emphasis. Make the content easy to read and well-structured. Make sure your response is complete. Do not cut off mid-sentence."""
 
         return prompt
 
@@ -381,7 +382,7 @@ Please provide detailed professional career advice covering:
 - Work-life balance optimization
 - Stress management and productivity tips
 
-**Important:** Use clear headings with emojis, bullet points for lists, and bold text for emphasis. Make the content easy to read and well-structured."""
+**Important:** Use clear headings with emojis, bullet points for lists, and bold text for emphasis. Make the content easy to read and well-structured. Make sure your response is complete. Do not cut off mid-sentence."""
 
         return prompt
 
@@ -398,10 +399,10 @@ Please provide detailed professional career advice covering:
         try:
             # Initialize the LLM with proper error handling and timeout
             llm = ChatGoogleGenerativeAI(
-                model="gemini-1.5-flash",
+                model="gemini-2.5-flash",
                 api_key=GEMINI_API_KEY,
                 temperature=0.7,
-                max_tokens=2000,
+                max_tokens=5000,
                 timeout=30,
                 max_retries=2
             )
@@ -552,10 +553,10 @@ Please provide detailed professional career advice covering:
 
             # Create the model
             llm = ChatGoogleGenerativeAI(
-                model="gemini-1.5-flash",
+                model="gemini-2.5-flash",
                 api_key=self.api_key,
                 temperature=0.7,
-                max_tokens=2000,
+                max_tokens=5000,
                 timeout=30,
                 max_retries=2
             )
@@ -594,12 +595,15 @@ Be supportive, professional, and encouraging. Keep responses concise but helpful
 
         try:
             prompt = f"Write a brief 2-3 sentence job description for a {job_title} role. Focus on main responsibilities and keep it concise for a UI card."
-            response = gemini_model.generate_content(prompt)
+            response = gemini_model.invoke(prompt)
 
-            if not response.text:
-                return f"Entry-level {job_title} role involving coding, testing, and learning new technologies under mentorship."
+            text = response.text() if callable(response.text) else response.text
 
-            content = response.text.strip()
+            if not text:
+                content = f"Entry-level {job_title} role involving coding, testing, and learning new technologies under mentorship."
+            else:
+                content = text.strip()
+
             # Limit to approximately 150 characters for UI
             if len(content) > 150:
                 content = content[:147] + "..."
@@ -639,12 +643,13 @@ Be supportive, professional, and encouraging. Keep responses concise but helpful
 
         try:
             prompt = f"List 4 short daily activities for a {job_title} role. Each activity should be 3-6 words maximum. Format as simple bullet points."
-            response = gemini_model.generate_content(prompt)
+            response = gemini_model.invoke(prompt)
 
-            if not response.text:
+            text = response.text() if callable(response.text) else response.text
+            if not text:
                 return fallback_points
-
-            content = response.text.strip()
+            else:
+                content = text.strip()
 
             # Extract points from the response
             points = []
@@ -819,9 +824,12 @@ Note: This is a mock response. Please fix the API connection to get personalized
 def analyze_skill_gap(current_skills: str, target_skills: str) -> Dict[str, Any]:
     """Analyze skill gap using Gemini AI"""
     try:
+        current_skills = current_skills.replace("\\", "\\\\").replace("\n", "\\n")
+        target_skills = target_skills.replace("\\", "\\\\").replace("\n", "\\n")
+
         # Create a fresh model instance with proper configuration
         llm = ChatGoogleGenerativeAI(
-            model="gemini-1.5-flash",
+            model="gemini-2.5-flash",
             api_key=GEMINI_API_KEY,
             temperature=0.7,
             max_tokens=2000,
@@ -833,10 +841,10 @@ def analyze_skill_gap(current_skills: str, target_skills: str) -> Dict[str, Any]
 You are an expert career counselor and skill gap analyst. Analyze the gap between current skills and target requirements.
 
 Current Skills and Experience:
-{current_skills}
+{json.dumps(current_skills)}
 
 Target Skills/Job Requirements:
-{target_skills}
+{json.dumps(target_skills)}
 
 Please provide a comprehensive analysis in the following JSON format:
 
@@ -857,7 +865,9 @@ Guidelines:
 - Focus on practical, achievable steps
 - Consider the person's existing experience level
 
-Respond ONLY with valid JSON format.
+Respond ONLY with valid, **complete**, and **strictly valid JSON**.
+Do not include any commentary, explanation, or markdown formatting.
+If you are unsure, still produce syntactically valid JSON.
 """
 
         response = llm.invoke(prompt)
@@ -874,8 +884,21 @@ Respond ONLY with valid JSON format.
             content = content[:-3]
         content = content.strip()
 
-        import json
-        result = json.loads(content)
+        try:
+            # Extract JSON substring if model added any text outside it
+            match = re.search(r"\{[\s\S]*\}", content)
+            if match:
+                json_str = match.group(0)
+            else:
+                json_str = content
+
+            result = json.loads(json_str)
+
+        except json.JSONDecodeError as e:
+            print("⚠️ Gemini returned malformed JSON.")
+            print("Raw content:\n", content)
+            print("JSON Error:", e)
+            return create_fallback_skill_analysis()
 
         # Validate required fields
         required_fields = ["summary", "existing_skills", "missing_skills", "learning_path", "timeline", "confidence_score"]
@@ -969,8 +992,8 @@ Guidelines:
 - Be realistic about timelines and expectations
 """
 
-        response = gemini_model.generate_content(prompt)
-        return response.text.strip() if response.text else "I'm here to help with your skill gap analysis! How can I assist you today?"
+        response = gemini_model.invoke(prompt)
+        return response.content.strip() if response.content else "I'm here to help with your skill gap analysis! How can I assist you today?"
 
     except Exception as e:
         print(f"❌ Error generating skill chat response with Gemini: {e}")
